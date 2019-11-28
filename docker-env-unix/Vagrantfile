@@ -1,0 +1,48 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+    # Configuring the VirtualBox VM so that it could sustain any application
+    config.vm.box = "centos/7"
+    config.vm.provider "virtualbox" do |v|
+      v.name = "docker-dev"
+      v.memory = 4096
+      v.cpus = 2
+    end
+    # Setting up the machine hostname
+    config.vm.hostname = "docker-host"
+
+    # Provisioning the VM with the ncessary docker tools
+    config.vm.provision "install", type: "shell", inline: <<-SHELL
+    sudo yum -y update
+    sudo yum install -y epel-release
+    sudo yum install -y yum-utils device-mapper-persistent-data lvm2
+    sudo yum install -y cifs-utils.x86_64
+    sudo yum install -y vim
+    sudo yum install -y net-tools
+
+    sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config;
+    sudo sed -i 's/GSSAPIAuthentication yes/GSSAPIAuthentication no/g' /etc/ssh/sshd_config;
+
+    sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    sudo yum install -y docker-ce
+    sudo yum list docker-ce --showduplicates | sort -r
+
+    sudo systemctl enable docker.service
+    sudo systemctl restart docker
+
+    sudo usermod -aG docker vagrant
+    sudo yum install -y python-pip
+    sudo pip install --upgrade pip
+    sudo pip install docker-compose
+
+    sudo echo "alias d='docker'" >> /home/vagrant/.bashrc
+    sudo echo "alias dc='docker-compose'" >> /home/vagrant/.bashrc
+SHELL
+
+    # Setup the network environment by creating a Host Only network and providing a static IP address
+    config.vm.network "private_network", ip: "192.168.150.150"
+
+    # Syncing the needed files to the app folder in the home directory on the vagrant machine.
+    config.vm.synced_folder './', '/home/vagrant/app', type: 'virtualbox'
+end
